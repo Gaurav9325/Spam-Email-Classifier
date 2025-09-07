@@ -1,18 +1,15 @@
-# Project 1: Spam Email Classifier using Logistic Regression
-# We'll use a small, custom dataset and the scikit-learn library.
+# Improved Spam Email Classifier
 
-# 1. Import necessary libraries
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report
+import joblib
 
-print("Libraries imported successfully.")
-
-# 2. Create a dummy dataset
-# In a real-world scenario, you would load data from a CSV or text file.
-# The 'text' column contains the email content, and the 'label' column is the target (0 for not spam, 1 for spam).
+# 1. Dataset (small sample, better to use larger dataset later)
 data = {
     'text': [
         "Hey, how are you doing?",
@@ -33,50 +30,49 @@ data = {
 }
 
 df = pd.DataFrame(data)
-print("\n--- Sample Dataset ---")
-print(df.head())
-print("-" * 20)
 
-# 3. Preprocessing: Convert text data into numerical features
+# 2. Preprocessing
 vectorizer = CountVectorizer(stop_words='english')
 X = vectorizer.fit_transform(df['text'])
 y = df['label']
 
-print(f"\nShape of the features matrix: {X.shape}")
-print(f"Number of unique words (features): {len(vectorizer.get_feature_names_out())}")
-print("-" * 20)
+# Balanced train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
 
-# 4. Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+# 3. Define models
+models = {
+    "Logistic Regression": LogisticRegression(),
+    "Decision Tree": DecisionTreeClassifier(),
+    "SVM": SVC()
+}
 
-print("\n--- Data Splitting ---")
-print(f"Training set size: {X_train.shape[0]} samples")
-print(f"Testing set size: {X_test.shape[0]} samples")
-print("-" * 20)
+# 4. Train, Evaluate, Save
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
 
-# 5. Train the Logistic Regression model
-model = LogisticRegression()
-model.fit(X_train, y_train)
+    print(f"\n--- {name} ---")
+    print(f"Accuracy: {accuracy_score(y_test, predictions):.2f}")
+    print("Classification Report:")
+    print(classification_report(y_test, predictions, zero_division=0))
 
-print("\nLogistic Regression model trained successfully.")
-print("-" * 20)
+    # Cross-validation (optional, gives better estimate)
+    scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+    print(f"Cross-validation Accuracy (5-fold): {scores.mean():.2f}")
 
-# 6. Make predictions and evaluate the model
-predictions = model.predict(X_test)
-accuracy = accuracy_score(y_test, predictions)
+    # Save model
+    filename = f"{name.replace(' ', '_').lower()}_spam_model.pkl"
+    joblib.dump(model, filename)
+    print(f"Model saved as {filename}")
 
-print("\n--- Model Evaluation ---")
-print(f"Accuracy: {accuracy:.2f}")
-print("\nClassification Report:")
-print("classification_report(y_test, predictions)")
-print("-" * 20)
+# 5. Load a saved model & test new email
+loaded_model = joblib.load("decision_tree_spam_model.pkl")
+new_email = ["Exclusive offer for you! Click now to win."]
+new_email_vec = vectorizer.transform(new_email)
+pred = loaded_model.predict(new_email_vec)
 
-# 7. Make a prediction on a new email
-new_email_text = ["Exclusive offer for you! Click now to win."]
-new_email_vectorized = vectorizer.transform(new_email_text)
-prediction = model.predict(new_email_vectorized)
-
-if prediction[0] == 1:
-    print(f"\nThe email '{new_email_text[0]}' is classified as: SPAM")
-else:
-    print(f"\nThe email '{new_email_text[0]}' is classified as: NOT SPAM")
+print("\n--- Loaded Model Prediction ---")
+print(f"Email: {new_email[0]}")
+print("Prediction:", "SPAM" if pred[0] == 1 else "NOT SPAM")
